@@ -1,29 +1,29 @@
 module dao::dao{
     // imports
-    use sui::object::{Self, UID, Map, Vec, String};
+    use sui::object::{Self, UID, Map, String};
     use sui::transfer;
     use sui::tx_context::{Self, TxContext};
 
     // Defining The DAO contract and Proposals
-    struct Dao has key, store {
-        admins: Vec<UID>,
-        proposals: Vec<Proposal>,
-        votes: Map<u32, Map<UID, bool>>
-        members: Vec<UID>,
-    }
-
-    struct Proposal has key, store{
+    struct Proposal{
         id: UID,
         title: String,
         description: String,
-        author: UID,
+        author: address,
         executed: bool,
         created_at_ms: u64,
     }
 
-    // implementing the DAO contract
-    impl Dao {
-        fn new() -> Self {
+    struct Dao has store {
+        admins: vector<address>,
+        proposals: vector<Proposal>,
+        votes: Map<u32, Map<UID, bool>>
+        members: vector<UID>,
+    }
+
+
+    // implementing the DAO contracts
+        fn init(ctx: &mut TxContext){
             Self {
                 admins: Vec::new(),
                 proposals: Vec::new(),
