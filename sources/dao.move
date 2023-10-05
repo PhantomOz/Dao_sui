@@ -14,62 +14,64 @@ module dao::dao{
         created_at_ms: u64,
     }
 
+    struct Vote {
+        proposal_id: UID,
+        vote: bool,
+    }
+
     struct Dao has store {
         admins: vector<address>,
         proposals: vector<Proposal>,
-        votes: Map<u32, Map<UID, bool>>
+        votes: vector<Vote>,
         members: vector<UID>,
     }
 
 
     // implementing the DAO contracts
-        fn init(ctx: &mut TxContext){
-            Self {
-                admins: Vec::new(),
-                proposals: Vec::new(),
-                votes: Map::new(),
-                members: Vec::new(),
-            }
-        }
+    fun init(ctx: &mut TxContext){
+        let admins = Dao{
+            admins: vector![ctx.sender],
+            proposals: vector![],
+            votes: vector![],
+            members: vector![],
+        };
+        ctx.store.set(admins);   
+    }
 
-        fn add_admin(&mut self, ctx: &TxContext, admin: UID) -> transfer::TransferResult<()> {
+    fun add_admin(ctx: &TxContext, admin: UID) -> transfer::TransferResult<()> {
+        if !self.admins.contains(&ctx.sender) {
+            return Err(transfer::Error::Unauthorized);
+        }
+        ctx.admins.push(admin);            
+    }
+
+        fun remove_admin(ctx: &TxContext, admin: UID) -> transfer::TransferResult<()> {
             if !self.admins.contains(&ctx.sender) {
                 return Err(transfer::Error::Unauthorized);
             }
-            self.admins.push(admin);
-            Ok(())
+            ctx.admins.retain(|&x| x != admin);
         }
 
-        fn remove_admin(&mut self, ctx: &TxContext, admin: UID) -> transfer::TransferResult<()> {
+        fun add_member(ctx: &TxContext, member: UID) -> transfer::TransferResult<()> {
             if !self.admins.contains(&ctx.sender) {
                 return Err(transfer::Error::Unauthorized);
             }
-            self.admins.retain(|&x| x != admin);
-            Ok(())
+            ctx.members.push(member);
         }
 
-        fn add_member(&mut self, ctx: &TxContext, member: UID) -> transfer::TransferResult<()> {
+        fun remove_member(ctx: &TxContext, member: UID) -> transfer::TransferResult<()> {
             if !self.admins.contains(&ctx.sender) {
                 return Err(transfer::Error::Unauthorized);
             }
-            self.members.push(member);
-            Ok(())
+            ctx.members.retain(|&x| x != member);
         }
 
-        fn remove_member(&mut self, ctx: &TxContext, member: UID) -> transfer::TransferResult<()> {
-            if !self.admins.contains(&ctx.sender) {
-                return Err(transfer::Error::Unauthorized);
-            }
-            self.members.retain(|&x| x != member);
-            Ok(())
-        }
-
-        fn create_proposal(&mut self, ctx: &TxContext, title: String, description: String) -> transfer::TransferResult<()> {
+        fun create_proposal(ctx: &TxContext, title: String, description: String) -> transfer::TransferResult<()> {
             if !self.members.contains(&ctx.sender) {
                 return Err(transfer::Error::Unauthorized);
             }
             let proposal = Proposal {
-                id: ctx.tx_id,
+                id: object::new(ctx),
                 title,
                 description,
                 author: ctx.sender,
@@ -77,10 +79,9 @@ module dao::dao{
                 created_at_ms: ctx.timestamp_ms,
             };
             self.proposals.push(proposal);
-            Ok(())
         }
 
-        fn vote(&mut self, ctx: &TxContext, proposal_id: UID, vote: bool) -> transfer::TransferResult<()> {
+        fun vote(&mut self, ctx: &TxContext, proposal_id: UID, vote: bool) -> transfer::TransferResult<()> {
             if !self.members.contains(&ctx.sender) {
                 return Err(transfer::Error::Unauthorized);
             }
@@ -91,10 +92,9 @@ module dao::dao{
                 self.votes.insert(proposal_id, Map::new());
             }
             self.votes.get_mut(&proposal_id).unwrap().insert(ctx.sender, vote);
-            Ok(())
         }
 
-        fn execute_proposal(&mut self, ctx: &TxContext, proposal_id: UID) -> transfer::TransferResult<()> {
+        fun execute_proposal(&mut self, ctx: &TxContext, proposal_id: UID) -> transfer::TransferResult<()> {
             if !self.admins.contains(&ctx.sender) {
                 return Err(transfer::Error::Unauthorized);
             }
@@ -117,13 +117,12 @@ module dao::dao{
             }
             if yes_votes > no_votes {
                 proposal.executed = true;
-                Ok(())
             } else {
                 Err(transfer::Error::InvalidInput)
             }
         }
 
-        fn get_proposal(&self, ctx: &TxContext, proposal_id: UID) -> transfer::TransferResult<Proposal> {
+        fun get_proposal(&self, ctx: &TxContext, proposal_id: UID) -> transfer::TransferResult<Proposal> {
             if !self.members.contains(&ctx.sender) {
                 return Err(transfer::Error::Unauthorized);
             }
@@ -133,14 +132,14 @@ module dao::dao{
             Ok(self.proposals.iter().find(|x| x.id == proposal_id).unwrap().clone())
         }
 
-        fn get_proposals(&self, ctx: &TxContext) -> transfer::TransferResult<Vec<Proposal>> {
+        fun get_proposals(&self, ctx: &TxContext) -> transfer::TransferResult<Vec<Proposal>> {
             if !self.members.contains(&ctx.sender) {
                 return Err(transfer::Error::Unauthorized);
             }
             Ok(self.proposals.clone())
         }
 
-        fn get_vote(&self, ctx: &TxContext, proposal_id: UID) -> transfer::TransferResult<bool> {
+        fun get_vote(&self, ctx: &TxContext, proposal_id: UID) -> transfer::TransferResult<bool> {
             if !self.members.contains(&ctx.sender) {
                 return Err(transfer::Error::Unauthorized);
             }
